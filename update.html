@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Pure Deck — Cập nhật</title>
+    <style>
+      :root { color-scheme: dark; font: 18px/1.6 system-ui, sans-serif; background: #080b0b; color: #e6ddc8; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 32px; background: radial-gradient(ellipse at 50% 10%, #30211b 0, transparent 65%); }
+      main { width: min(100%, 640px); padding: 36px; border-top: 2px solid #a18d64; border-bottom: 1px solid #615742; background: #0b0e0deb; }
+      .brand { margin: 0; color: #b8a77f; letter-spacing: .2em; font-size: 14px; }
+      h1 { margin: 12px 0 20px; font: 34px/1.25 Georgia, serif; }
+      p { margin: 0 0 20px; }
+      #status { min-height: 56px; color: #bfcabd; }
+      #status[data-error="true"] { color: #efb599; }
+      button { width: 100%; min-height: 60px; padding: 12px 20px; color: #151611; background: #e6ddc8; border: 2px solid #bca779; font: 600 18px/1.4 system-ui; cursor: pointer; }
+      button:hover:not(:disabled) { background: #f4eddc; }
+      button:disabled { opacity: .45; cursor: wait; }
+      button:focus-visible, a:focus-visible { outline: 2px solid #9ecfd0; outline-offset: 5px; }
+      .back { display: inline-block; margin-top: 24px; color: #cbbd9d; text-underline-offset: 4px; }
+      small { display: block; margin-top: 18px; color: #9b998b; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="brand">PURE DECK</p>
+      <h1 id="title">Mở phiên bản mới</h1>
+      <p id="description">Bản ngoại tuyến có thể giữ game ở phiên bản cũ. Tiếp tục từ lần lưu gần nhất với bản đang chạy trên máy chủ.</p>
+      <p id="status" role="status" aria-live="polite">Đang kiểm tra bản mới…</p>
+      <button id="update" type="button" disabled>Mở bản mới nhất</button>
+      <small id="safety">Giữ nguyên tiến trình, bản lưu dự phòng và cài đặt. Không xóa dữ liệu trình duyệt.</small>
+      <a class="back" id="back" href="/play">Quay lại game</a>
+      <noscript>Cần bật JavaScript để cập nhật game.</noscript>
+    </main>
+    <script type="module">
+      // This network-only page deliberately lives OUTSIDE the /play SW scope.
+      // Never cache it in the offline pack: it must be reachable from old builds.
+      // Do not access IndexedDB/localStorage or delete any cache here.
+      const english = new URL(location.href).searchParams.get('lang') === 'en';
+      const copy = (vi, en) => english ? en : vi;
+      const button = document.getElementById('update');
+      const status = document.getElementById('status');
+      if (english) {
+        document.documentElement.lang = 'en';
+        document.title = 'Pure Deck — Update';
+        document.getElementById('title').textContent = 'Open the latest version';
+        document.getElementById('description').textContent = 'The offline copy can keep the game on an older version. Continue from your last save with the version currently on the server.';
+        document.getElementById('safety').textContent = 'Your progress, backup save and settings are kept. No browser data is deleted.';
+        document.getElementById('back').textContent = 'Return to game';
+      }
+      let busy = false;
+      async function verifyLatest() {
+        const signal = AbortSignal.timeout(30000);
+        const options = { cache: 'no-store', credentials: 'same-origin', signal };
+        const response = await fetch('/pure-deck-offline.json', options);
+        if (!response.ok) throw new Error('Manifest unavailable');
+        const manifest = await response.json();
+        if (!/^[a-f0-9]{24}$/.test(manifest.revision) ||
+            typeof manifest.browserEntry !== 'string' ||
+            !manifest.browserEntry.startsWith('/_next/static/') ||
+            new URL(manifest.browserEntry, location.origin).origin !== location.origin)
+          throw new Error('Invalid build metadata');
+        const [html, entry] = await Promise.all([
+          fetch('/play', { ...options, headers: { Accept: 'text/html' } }),
+          fetch(manifest.browserEntry, options),
+        ]);
+        if (!html.ok || !entry.ok || !html.headers.get('content-type')?.includes('text/html') ||
+            !entry.headers.get('content-type')?.includes('javascript') ||
+            !(await html.text()).includes(manifest.browserEntry))
+          throw new Error('Build is not ready');
+        return manifest.revision;
+      }
+      async function check() {
+        button.disabled = true;
+        status.dataset.error = 'false';
+        status.textContent = copy('Đang kiểm tra bản mới…', 'Checking the latest version…');
+        try {
+          const revision = await verifyLatest();
+          status.textContent = copy('Bản mới đã sẵn sàng.', 'The latest version is ready.');
+          status.dataset.revision = revision;
+          button.textContent = copy('Mở bản mới nhất', 'Open latest version');
+        } catch {
+          status.dataset.error = 'true';
+          status.textContent = copy('Chưa kết nối được bản mới. Bản ngoại tuyến và save vẫn nguyên vẹn. Hãy thử lại khi máy chủ sẵn sàng.', 'The latest version is not reachable. Your offline copy and save are untouched. Retry when the server is ready.');
+          button.textContent = copy('Thử lại', 'Retry');
+        } finally { button.disabled = false; }
+      }
+      button.addEventListener('click', async () => {
+        if (busy) return;
+        busy = true;
+        button.disabled = true;
+        status.dataset.error = 'false';
+        status.textContent = copy('Đang mở bản mới — giữ nguyên bản lưu…', 'Opening the latest version — keeping your save…');
+        try {
+          // Check again before changing registration; an offline click is harmless.
+          const revision = await verifyLatest();
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration('/play');
+            if (registration) {
+              const scope = new URL(registration.scope);
+              const workers = [registration.active, registration.waiting, registration.installing].filter(Boolean);
+              const belongsToGame = scope.origin === location.origin && scope.pathname === '/play' &&
+                workers.length > 0 && workers.every(worker => {
+                  const script = new URL(worker.scriptURL);
+                  return script.origin === location.origin && script.pathname === '/pure-deck-sw.js';
+                });
+              if (!belongsToGame) throw new Error('Unexpected service worker; left untouched');
+              // Existing tabs keep their controller. Only this next navigation uses
+              // the fresh network build; no skipWaiting/claim, forced reload or wipe.
+              await registration.unregister();
+            }
+          }
+          location.replace('/play?updated=' + encodeURIComponent(revision));
+        } catch {
+          status.dataset.error = 'true';
+          status.textContent = copy('Chưa mở được bản mới. Không có bản lưu nào bị xóa. Kiểm tra kết nối rồi thử lại.', 'Could not open the latest version. No save was deleted. Check the connection and retry.');
+          button.textContent = copy('Thử lại', 'Retry');
+          button.disabled = false;
+          busy = false;
+        }
+      });
+      void check();
+    </script>
+  </body>
+</html>

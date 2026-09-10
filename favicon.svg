@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pure Deck four-faced die">
+  <defs>
+    <linearGradient id="iron" x1="12" y1="8" x2="52" y2="57" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6f6655"/>
+      <stop offset="0.46" stop-color="#211f1b"/>
+      <stop offset="1" stop-color="#8c7854"/>
+    </linearGradient>
+    <linearGradient id="ivory" x1="22" y1="18" x2="44" y2="47" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff9e8"/>
+      <stop offset="1" stop-color="#c8bfaa"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 3h36l11 11v36L50 61H14L3 50V14Z" fill="#050807"/>
+  <path d="M15 5h34l10 10v34L49 59H15L5 49V15Zm2 4-8 8v30l8 8h30l8-8V17l-8-8Z" fill="url(#iron)" fill-rule="evenodd"/>
+  <path d="m30 4 2-4 2 4-2 7Zm0 56 2-7 2 7-2 4Z" fill="#c9a65d"/>
+  <path d="M20 15h24l5 5v24l-5 5H20l-5-5V20Z" fill="url(#ivory)" stroke="#fff8e6" stroke-width="1.4"/>
+  <g fill="#090b0a">
+    <circle cx="24" cy="24" r="3.3"/>
+    <circle cx="40" cy="24" r="3.3"/>
+    <circle cx="24" cy="40" r="3.3"/>
+    <circle cx="40" cy="40" r="3.3"/>
+  </g>
+</svg>
